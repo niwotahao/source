@@ -8,24 +8,25 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=gdb
-PKG_VERSION:=7.12.1
-PKG_RELEASE:=3
+PKG_VERSION:=8.2.1
+PKG_RELEASE:=2
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.xz
 PKG_SOURCE_URL:=@GNU/gdb
-PKG_HASH:=4607680b973d3ec92c30ad029f1b7dbde3876869e6b3a117d8a7e90081113186
+PKG_HASH:=0a6a432907a03c5c8eaad3c3cffd50c00a40c3a5e3c4039440624bae703f2202
 
 PKG_BUILD_PARALLEL:=1
 PKG_INSTALL:=1
 PKG_LICENSE:=GPL-3.0+
+PKG_CPE_ID:=cpe:/a:gnu:gdb
 
 include $(INCLUDE_DIR)/package.mk
 
 define Package/gdb/Default
   SECTION:=devel
   CATEGORY:=Development
-  DEPENDS:=+!USE_MUSL:libthread-db +PACKAGE_zlib:zlib @!arc
-  URL:=http://www.gnu.org/software/gdb/
+  DEPENDS:=+!USE_MUSL:libthread-db +PACKAGE_zlib:zlib
+  URL:=https://www.gnu.org/software/gdb/
 endef
 
 define Package/gdb
@@ -60,6 +61,10 @@ CONFIGURE_ARGS+= \
 
 CONFIGURE_VARS+= \
 	ac_cv_search_tgetent="$(TARGET_LDFLAGS) -lncurses -lreadline"
+
+TARGET_LDFLAGS+= \
+	-static-libstdc++ \
+	-Wl,--gc-sections
 
 define Build/Install
 	$(MAKE) -C $(PKG_BUILD_DIR) \

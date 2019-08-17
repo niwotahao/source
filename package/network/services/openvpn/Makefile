@@ -9,23 +9,22 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=openvpn
 
-PKG_VERSION:=2.4.3
-PKG_RELEASE:=1
+PKG_VERSION:=2.4.7
+PKG_RELEASE:=2
 
 PKG_SOURCE_URL:=\
 	https://build.openvpn.net/downloads/releases/ \
-	https://swupdate.openvpn.net/community/releases/ \
-	http://www.eurephia.net/openvpn/
+	https://swupdate.openvpn.net/community/releases/
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.xz
-PKG_HASH:=7aa86167a5b8923e54e8795b814ed77288c793671f59fd830d9ab76d4b480571
+PKG_HASH:=a42f53570f669eaf10af68e98d65b531015ff9e12be7a62d9269ea684652f648
 
-PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(BUILD_VARIANT)/$(PKG_NAME)-$(PKG_VERSION)
 PKG_MAINTAINER:=Felix Fietkau <nbd@nbd.name>
 
 PKG_INSTALL:=1
 PKG_FIXUP:=autoreconf
 PKG_BUILD_PARALLEL:=1
 PKG_LICENSE:=GPL-2.0
+PKG_CPE_ID:=cpe:/a:openvpn:openvpn
 
 include $(INCLUDE_DIR)/package.mk
 
@@ -45,7 +44,7 @@ else
 endif
 endef
 
-Package/openvpn-openssl=$(call Package/openvpn/Default,openssl,OpenSSL,+PACKAGE_openvpn-openssl:libopenssl)
+Package/openvpn-openssl=$(call Package/openvpn/Default,openssl,OpenSSL,+PACKAGE_openvpn-openssl:libopenssl +@OPENSSL_WITH_DEPRECATED)
 Package/openvpn-mbedtls=$(call Package/openvpn/Default,mbedtls,mbedTLS,+PACKAGE_openvpn-mbedtls:libmbedtls)
 Package/openvpn-nossl=$(call Package/openvpn/Default,nossl,plaintext (no SSL))
 
@@ -86,17 +85,16 @@ define Build/Configure
 		--disable-pkcs11 \
 		$(if $(CONFIG_OPENVPN_$(BUILD_VARIANT)_ENABLE_LZO),--enable,--disable)-lzo \
 		$(if $(CONFIG_OPENVPN_$(BUILD_VARIANT)_ENABLE_LZ4),--enable,--disable)-lz4 \
-		$(if $(CONFIG_OPENVPN_$(BUILD_VARIANT)_ENABLE_X509_ALT_USERNAME),enable,disable-x509-alt-username)-ssl \
+		$(if $(CONFIG_OPENVPN_$(BUILD_VARIANT)_ENABLE_X509_ALT_USERNAME),--enable,--disable)-x509-alt-username \
 		$(if $(CONFIG_OPENVPN_$(BUILD_VARIANT)_ENABLE_SERVER),--enable,--disable)-server \
 		$(if $(CONFIG_OPENVPN_$(BUILD_VARIANT)_ENABLE_MANAGEMENT),--enable,--disable)-management \
-		$(if $(CONFIG_OPENVPN_$(BUILD_VARIANT)_ENABLE_SOCKS),--enable,--disable)-socks \
-		$(if $(CONFIG_OPENVPN_$(BUILD_VARIANT)_ENABLE_HTTP),--enable,--disable)-http-proxy \
 		$(if $(CONFIG_OPENVPN_$(BUILD_VARIANT)_ENABLE_FRAGMENT),--enable,--disable)-fragment \
 		$(if $(CONFIG_OPENVPN_$(BUILD_VARIANT)_ENABLE_MULTIHOME),--enable,--disable)-multihome \
 		$(if $(CONFIG_OPENVPN_$(BUILD_VARIANT)_ENABLE_IPROUTE2),--enable,--disable)-iproute2 \
 		$(if $(CONFIG_OPENVPN_$(BUILD_VARIANT)_ENABLE_DEF_AUTH),--enable,--disable)-def-auth \
 		$(if $(CONFIG_OPENVPN_$(BUILD_VARIANT)_ENABLE_PF),--enable,--disable)-pf \
-		$(if $(CONFIG_OPENVPN_NOSSL),--disable-ssl --disable-crypto,--enable-ssl --enable-crypto) \
+		$(if $(CONFIG_OPENVPN_$(BUILD_VARIANT)_ENABLE_PORT_SHARE),--enable,--disable)-port-share \
+		$(if $(CONFIG_OPENVPN_NOSSL),--disable-crypto,--enable-crypto) \
 		$(if $(CONFIG_OPENVPN_OPENSSL),--with-crypto-library=openssl) \
 		$(if $(CONFIG_OPENVPN_MBEDTLS),--with-crypto-library=mbedtls) \
 	)

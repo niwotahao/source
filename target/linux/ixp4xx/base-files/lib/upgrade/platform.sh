@@ -128,22 +128,10 @@ platform_do_upgrade() {
 	v "board=$board"
 	case "$board" in
 	avila | cambria )
-		platform_do_upgrade_combined "$ARGV"
+		platform_do_upgrade_combined "$1"
 		;;
 	*)
-		default_do_upgrade "$ARGV"
+		default_do_upgrade "$1"
 		;;
 	esac
 }
-
-disable_watchdog() {
-	v "killing watchdog"
-	killall watchdog
-	( ps | grep -v 'grep' | grep '/dev/watchdog' ) && {
-		echo 'Could not disable watchdog'
-		return 1
-	}
-}
-
-# CONFIG_WATCHDOG_NOWAYOUT=y - can't kill watchdog unless kernel cmdline has a mpcore_wdt.nowayout=0
-#append sysupgrade_pre_upgrade disable_watchdog

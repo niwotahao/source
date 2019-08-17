@@ -33,6 +33,8 @@
 #include <linux/etherdevice.h>
 #include <linux/interrupt.h>
 #include <linux/netdevice.h>
+#include <linux/platform_device.h>
+#include <linux/of_device.h>
 
 #include "ifxmips_ptm_vdsl.h"
 #include <lantiq_soc.h>
@@ -74,7 +76,9 @@ static int ptm_stop(struct net_device *);
   static unsigned int ptm_poll(int, unsigned int);
   static int ptm_napi_poll(struct napi_struct *, int);
 static int ptm_hard_start_xmit(struct sk_buff *, struct net_device *);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,10,0))
 static int ptm_change_mtu(struct net_device *, int);
+#endif
 static int ptm_ioctl(struct net_device *, struct ifreq *, int);
 static void ptm_tx_timeout(struct net_device *);
 
@@ -115,13 +119,15 @@ static struct net_device_ops g_ptm_netdev_ops = {
     .ndo_start_xmit      = ptm_hard_start_xmit,
     .ndo_validate_addr   = eth_validate_addr,
     .ndo_set_mac_address = eth_mac_addr,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,10,0))
     .ndo_change_mtu      = ptm_change_mtu,
+#endif
     .ndo_do_ioctl        = ptm_ioctl,
     .ndo_tx_timeout      = ptm_tx_timeout,
 };
 
 static struct net_device *g_net_dev[1] = {0};
-static char *g_net_dev_name[1] = {"ptm0"};
+static char *g_net_dev_name[1] = {"dsl0"};
 
 static int g_ptm_prio_queue_map[8];
 
@@ -141,6 +147,10 @@ static void ptm_setup(struct net_device *dev, int ndev)
     netif_carrier_off(dev);
 
     dev->netdev_ops      = &g_ptm_netdev_ops;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4,10,0))
+    /* Allow up to 1508 bytes, for RFC4638 */
+    dev->max_mtu         = ETH_DATA_LEN + 8;
+#endif
     netif_napi_add(dev, &g_ptm_priv_data.itf[ndev].napi, ptm_napi_poll, 16);
     dev->watchdog_timeo  = ETH_WATCHDOG_TIMEOUT;
 
@@ -218,7 +228,9 @@ static unsigned int ptm_poll(int ndev, unsigned int work_to_do)
             skb->dev = g_net_dev[0];
             skb->protocol = eth_type_trans(skb, skb->dev);
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,11,0))
             g_net_dev[0]->last_rx = jiffies;
+#endif
 
             netif_receive_skb(skb);
 
@@ -367,6 +379,7 @@ PTM_HARD_START_XMIT_FAIL:
     return 0;
 }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,10,0))
 static int ptm_change_mtu(struct net_device *dev, int mtu)
 {
 	/* Allow up to 1508 bytes, for RFC4638 */
@@ -375,6 +388,7 @@ static int ptm_change_mtu(struct net_device *dev, int mtu)
         dev->mtu = mtu;
         return 0;
 }
+#endif
 
 static int ptm_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
@@ -959,9 +973,21 @@ static int ptm_showtime_exit(void)
 	return 0;
 }
 
+static const struct of_device_id ltq_ptm_match[] = {
+#ifdef CONFIG_DANUBE
+	{ .compatible = "lantiq,ppe-danube", .data = NULL },
+#elif defined CONFIG_AMAZON_SE
+	{ .compatible = "lantiq,ppe-ase", .data = NULL },
+#elif defined CONFIG_AR9
+	{ .compatible = "lantiq,ppe-arx100", .data = NULL },
+#elif defined CONFIG_VR9
+	{ .compatible = "lantiq,ppe-xrx200", .data = NULL },
+#endif
+	{},
+};
+MODULE_DEVICE_TABLE(of, ltq_ptm_match);
 
-
-static int ifx_ptm_init(void)
+static int ltq_ptm_probe(struct platform_device *pdev)
 {
     int ret;
     int i;
@@ -974,7 +1000,7 @@ static int ifx_ptm_init(void)
         goto INIT_PRIV_DATA_FAIL;
     }
 
-    ifx_ptm_init_chip();
+    ifx_ptm_init_chip(pdev);
     ret = init_tables();
     if ( ret != 0 ) {
         err("INIT_TABLES_FAIL");
@@ -1022,7 +1048,10 @@ static int ifx_ptm_init(void)
     enable_irq(PPE_MAILBOX_IGU1_INT);
 
     ifx_mei_atm_showtime_check(&g_showtime, &port_cell, &g_xdata_addr);
-    
+    if ( g_showtime ) {
+	ptm_showtime_enter(&port_cell, &g_xdata_addr);
+    }
+
     ifx_mei_atm_showtime_enter = ptm_showtime_enter;
     ifx_mei_atm_showtime_exit  = ptm_showtime_exit;
 
@@ -1053,7 +1082,7 @@ INIT_PRIV_DATA_FAIL:
     return ret;
 }
 
-static void __exit ifx_ptm_exit(void)
+static int ltq_ptm_remove(struct platform_device *pdev)
 {
     int i;
 	ifx_mei_atm_showtime_enter = NULL;
@@ -1077,6 +1106,8 @@ static void __exit ifx_ptm_exit(void)
     ifx_ptm_uninit_chip();
 
     clear_priv_data();
+
+    return 0;
 }
 
 #ifndef MODULE
@@ -1105,8 +1136,17 @@ static int __init queue_gamma_map_setup(char *line)
     return 0;
 }
 #endif
-module_init(ifx_ptm_init);
-module_exit(ifx_ptm_exit);
+static struct platform_driver ltq_ptm_driver = {
+	.probe = ltq_ptm_probe,
+	.remove = ltq_ptm_remove,
+	.driver = {
+		.name = "ptm",
+		.owner = THIS_MODULE,
+		.of_match_table = ltq_ptm_match,
+	},
+};
+
+module_platform_driver(ltq_ptm_driver);
 #ifndef MODULE
   __setup("wanqos_en=", wanqos_en_setup);
   __setup("queue_gamma_map=", queue_gamma_map_setup);

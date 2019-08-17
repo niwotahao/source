@@ -8,17 +8,18 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=uhttpd
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
 PKG_SOURCE_PROTO:=git
-PKG_SOURCE_URL=$(LEDE_GIT)/project/uhttpd.git
-PKG_SOURCE_DATE:=2016-10-25
-PKG_SOURCE_VERSION:=1628fa4b34aa143187353f81e8001b9a15286bda
-PKG_MIRROR_HASH:=2ac4ba8dc0b349d72174aac9ff693a73a214295a9890fe3d2a8eedcad54d06e3
+PKG_SOURCE_URL=$(PROJECT_GIT)/project/uhttpd.git
+PKG_SOURCE_DATE:=2019-06-16
+PKG_SOURCE_VERSION:=91fcac34ac014a565fdd6312de088d312b5ba7ec
+PKG_MIRROR_HASH:=97fce84dabfe8902edd57784a5ae5e8acdfc7fd4be26cf72405c4b6116e2799b
 PKG_MAINTAINER:=Felix Fietkau <nbd@nbd.name>
 PKG_LICENSE:=ISC
 
 PKG_BUILD_DEPENDS = ustream-ssl
+PKG_CONFIG_DEPENDS:= CONFIG_uhttpd_lua
 
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/cmake.mk
@@ -33,7 +34,7 @@ endef
 
 define Package/uhttpd
   $(Package/uhttpd/default)
-  DEPENDS:=+libubox +libblobmsg-json +libjson-script
+  DEPENDS:=+libubox +libblobmsg-json +libjson-script +libjson-c
 endef
 
 define Package/uhttpd/description
@@ -43,9 +44,6 @@ define Package/uhttpd/description
 endef
 
 define Package/uhttpd/config
-  config PACKAGE_uhttpd_debug
-    bool "Build with debug messages"
-    default n
   config uhttpd_lua
     depends on PACKAGE_uhttpd-mod-lua
     bool "Enable Integrated Lua interpreter"
@@ -107,16 +105,6 @@ define Package/uhttpd-mod-ubus/install
 	$(INSTALL_DIR) $(1)/usr/lib $(1)/etc/uci-defaults
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/uhttpd_ubus.so $(1)/usr/lib/
 	$(INSTALL_DATA) ./files/ubus.default $(1)/etc/uci-defaults/00_uhttpd_ubus
-endef
-
-define Package/uhttpd-mod-lua/postinst
-	$(if $(CONFIG_uhttpd_lua),
-	#!/bin/sh
-	if [ -f $${IPKG_INSTROOT}/www/index.html ]
-	then
-		sed -e 's:/cgi-bin::g' -i $${IPKG_INSTROOT}/www/index.html
-	fi
-	,)
 endef
 
 
